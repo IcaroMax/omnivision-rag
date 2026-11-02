@@ -1,0 +1,40 @@
+services:
+  pgvector-db:
+    image: pgvector/pgvector:pg16
+    container_name: omnivision-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: rag_password
+      POSTGRES_DB: omnivision_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d omnivision_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  streamlit-app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: omnivision-ui
+    restart: unless-stopped
+    depends_on:
+      pgvector-db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://rag_user:rag_password@pgvector-db:5432/omnivision_db
+      - CLIP_MODEL=ViT-B-32
+      - CLIP_PRETRAINED=laion2b_s34b_b79k
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../src:/app/src
+      - ../storage:/app/storage
+
+volumes:
+  pgvector_data:
